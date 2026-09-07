@@ -1979,6 +1979,7 @@ function updatePaymentSummary() {
 
 
 async function placeOrder() {
+
   const name =
     document.getElementById("custName").value.trim();
 
@@ -1997,13 +1998,39 @@ async function placeOrder() {
   const paymentMethod =
     document.getElementById("payment").value;
 
+  const paymentFile =
+    document.getElementById("paymentScreenshot")?.files?.[0];
+
+    if (!paymentFile) {
+    return alert("Please upload your payment screenshot.");
+  }
+
+  const paymentProof = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      resolve({
+        fileName: paymentFile.name,
+        mimeType: paymentFile.type,
+        base64: reader.result
+      });
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Unable to read payment screenshot."));
+    };
+
+    reader.readAsDataURL(paymentFile);
+  });
+
+  // ============================================
+  // VALIDATION
+  // ============================================
+
   if (!name)
     return alert("Please enter your full name.");
 
-  if (
-    !email ||
-    !/^\S+@\S+\.\S+$/.test(email)
-  )
+  if (!email || !/^\S+@\S+\.\S+$/.test(email))
     return alert("Please enter a valid email address.");
 
   if (!phone)
@@ -2015,42 +2042,122 @@ async function placeOrder() {
   if (!cart.length)
     return alert("Your cart is empty.");
 
+  if (!paymentFile)
+    return alert("Please upload your payment screenshot.");
+
+  // ============================================
+  // CHECK FILE TYPE
+  // ============================================
+
+  if (!paymentFile.type.startsWith("image/")) {
+    return alert("Please upload an image file.");
+  }
+
+  // ============================================
+  // CALCULATE TOTAL
+  // ============================================
+
   const total = cart.reduce(
-    (sum, item) =>
-  sum + PRODUCTS.find(p => p.id === item.id).price * item.quantity,
+    (sum, item) => {
+      const product = PRODUCTS.find(
+        p => p.id === item.id
+      );
+
+      return sum +
+        Number(product?.price || 0) *
+        Number(item.quantity || 0);
+    },
     0
   );
 
-    const paidNow =
-        payOption === "dp"
-            ? Math.ceil(total / 2)
-            : total;
-    
+  const paidNow =
+    payOption === "dp"
+      ? Math.ceil(total / 2)
+      : total;
+
   const balance =
     total - paidNow;
 
+  // ============================================
+  // ORDER ITEMS
+  // ============================================
+
   const items = cart.map(item => {
+
     const product =
-      PRODUCTS.find(p => p.id === item.id);
+      PRODUCTS.find(
+        p => p.id === item.id
+      );
 
     return {
       id: product.id,
       name: product.name,
-        qty: item.quantity,
-      price: product.price,
-        subtotal: product.price * item.quantity
+      qty: Number(item.quantity || 0),
+      flavor: item.flavor || "",
+      price: Number(product.price || 0),
+      subtotal:
+        Number(product.price || 0) *
+        Number(item.quantity || 0)
     };
+
   });
 
   const btn =
     document.getElementById("placeOrderBtn");
 
-  btn.disabled = true;
+btn.disabled = true;
+btn.textContent = "Uploading Payment Proof…";
+
+try {
+
+  // ========================================
+  // CONVERT PAYMENT SCREENSHOT TO BASE64
+  // ========================================
+
+  const paymentProof = await new Promise((resolve, reject) => {
+
+    if (!paymentFile) {
+      reject(new Error("Please upload your payment screenshot."));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+
+      resolve({
+        fileName: paymentFile.name,
+        mimeType: paymentFile.type,
+        base64: reader.result
+      });
+
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Unable to read the payment screenshot."));
+    };
+
+    reader.readAsDataURL(paymentFile);
+
+  });
+
   btn.textContent = "Placing Order…";
 
-  try {
+    // ============================================
+    // READ + COMPRESS PAYMENT SCREENSHOT
+    // ============================================
+
+    const paymentProof =
+      await preparePaymentProof(paymentFile);
+
+    btn.textContent = "Placing Order…";
+
+    // ============================================
+    // SEND ORDER TO GOOGLE APPS SCRIPT
+    // ============================================
 
     const response = await fetch(API_URL, {
+
       method: "POST",
 
       headers: {
@@ -2059,45 +2166,68 @@ async function placeOrder() {
       },
 
       body: JSON.stringify({
+
         action: "createOrder",
 
         order: {
+
           name,
           email,
           phone,
           address,
+
           payOption,
           paymentMethod,
+
           total,
           paidNow,
           balance,
-          items
+
+          items,
+
+          // PAYMENT PROOF
+          paymentProof
+
         }
+
       })
+
     });
 
     const result =
       await response.json();
 
     if (!result.success) {
+
       throw new Error(
         result.message ||
         "Unable to place order."
       );
+
     }
 
+    // ============================================
+    // SAVE LAST ORDER
+    // ============================================
+
     const savedOrder = {
+
       orderNo: result.orderNo,
+
       name,
       email,
       phone,
       address,
+
       payOption,
       paymentMethod,
+
       total,
       paidNow,
       balance,
+
       status: result.status
+
     };
 
     localStorage.setItem(
@@ -2105,23 +2235,48 @@ async function placeOrder() {
       JSON.stringify(savedOrder)
     );
 
-      cart = [];
-      localStorage.removeItem("mamaAliCart");
-      updateCartCount();
-      
+    // ============================================
+    // CLEAR CART
+    // ============================================
+
+    cart = [];
+
+    localStorage.removeItem(
+      "mamaAliCart"
+    );
+
+    updateCartCount();
+
+    // ============================================
+    // SUCCESS MESSAGE
+    // ============================================
 
     document.getElementById(
       "modalContent"
     ).innerHTML = `
+
       <h2>Order Placed 🎉</h2>
 
-      <p>Thank you, ${name}!</p>
+      <p>
+        Thank you, ${esc(name)}!
+      </p>
 
-      <div style="background:#fbf8f0;padding:18px;border-radius:10px">
+      <div style="
+        background:#fbf8f0;
+        padding:18px;
+        border-radius:10px;
+      ">
 
-        <strong>Order #${result.orderNo}</strong><br>
+        <strong>
+          Order #${esc(result.orderNo)}
+        </strong>
 
-        Total: ${money(total)}<br>
+        <br>
+
+        Total:
+        ${money(total)}
+
+        <br>
 
         Payment:
         ${
@@ -2129,34 +2284,59 @@ async function placeOrder() {
             ? "50% Down Payment"
             : "Full Payment"
         }
-        — ${paymentMethod}<br>
+        — ${esc(paymentMethod)}
+
+        <br>
 
         Amount Due Now:
-        ${money(paidNow)}<br>
+        ${money(paidNow)}
+
+        <br>
 
         Remaining Balance:
-        ${money(balance)}<br>
+        ${money(balance)}
 
-        Batch: September Pasabuy<br>
+        <br>
 
-        ETA: September 13
+        Batch:
+        September Pasabuy
+
+        <br>
+
+        ETA:
+        September 13
+
+        <br><br>
+
+        <span style="
+          color:#087574;
+          font-weight:600;
+        ">
+          ✓ Payment proof uploaded
+        </span>
 
       </div>
 
       <p style="color:#6e7c7c">
-        A confirmation email has been sent to ${email}.
+        A confirmation email has been sent to
+        ${esc(email)}.
       </p>
 
       <button
         class="btn primary full"
-        onclick="showTrack()">
+        onclick="showTrack()"
+      >
         Track This Order
       </button>
+
     `;
 
   } catch (error) {
 
-    console.error(error);
+    console.error(
+      "PLACE ORDER ERROR:",
+      error
+    );
 
     btn.disabled = false;
     btn.textContent = "Place Order";
@@ -2165,9 +2345,130 @@ async function placeOrder() {
       "We couldn't place the order yet. Please try again.\n\n" +
       error.message
     );
+
   }
+
 }
 
+
+
+// ============================================
+// PAYMENT PROOF PREPARATION
+// ============================================
+
+function preparePaymentProof(file) {
+
+  return new Promise((resolve, reject) => {
+
+    const reader =
+      new FileReader();
+
+    reader.onload = function(event) {
+
+      const img =
+        new Image();
+
+      img.onload = function() {
+
+        // Keep uploaded image reasonably small
+        const maxWidth = 1600;
+        const maxHeight = 1600;
+
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+
+          height =
+            height * (maxWidth / width);
+
+          width = maxWidth;
+
+        }
+
+        if (height > maxHeight) {
+
+          width =
+            width * (maxHeight / height);
+
+          height = maxHeight;
+
+        }
+
+        const canvas =
+          document.createElement("canvas");
+
+        canvas.width =
+          Math.round(width);
+
+        canvas.height =
+          Math.round(height);
+
+        const ctx =
+          canvas.getContext("2d");
+
+        ctx.drawImage(
+          img,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        // JPEG compression
+        const compressed =
+          canvas.toDataURL(
+            "image/jpeg",
+            0.75
+          );
+
+        resolve({
+
+          fileName:
+            file.name
+              .replace(/\.[^/.]+$/, "") +
+            ".jpg",
+
+          mimeType:
+            "image/jpeg",
+
+          data:
+            compressed.split(",")[1]
+
+        });
+
+      };
+
+      img.onerror = function() {
+
+        reject(
+          new Error(
+            "Unable to read the payment screenshot."
+          )
+        );
+
+      };
+
+      img.src =
+        event.target.result;
+
+    };
+
+    reader.onerror = function() {
+
+      reject(
+        new Error(
+          "Unable to read the payment screenshot."
+        )
+      );
+
+    };
+
+    reader.readAsDataURL(file);
+
+  });
+
+}
 
 // ============================================
 // EVENTS
