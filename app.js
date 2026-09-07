@@ -1311,31 +1311,36 @@ function trackOrder() {
 
 
   result.innerHTML = `
+  <div style="
+    margin-top:20px;
+    padding:20px;
+    border-radius:16px;
+    background:#f8f9f9;
+  ">
 
-    <div style="margin-top:20px;">
-
-      <strong>
-        Order received
-      </strong>
-
-
-      <p>
-        Your order number is:
-        <strong>
-          ${esc(number)}
-        </strong>
-      </p>
-
-
-      <p>
-        Tracking information will be
-        available once your pasabuy order
-        has been processed.
-      </p>
-
+    <div style="
+      font-size:20px;
+      font-weight:700;
+      color:#006b68;
+      margin-bottom:8px;
+    ">
+      Track Your Order
     </div>
 
-  `;
+    <div style="
+      font-size:14px;
+      color:#555;
+      margin-bottom:20px;
+    ">
+      Order No. <strong>${esc(number)}</strong>
+    </div>
+
+    <div id="orderTimeline">
+      Loading order status...
+    </div>
+
+  </div>
+`;
 }
 
 
