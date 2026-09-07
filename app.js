@@ -25,7 +25,7 @@ const PRODUCTS = [
     id: "P002",
     name: "Lipton Berry mix Tea",
     category: "Drinks",
-    price: 0,
+    price: 200,
     folder: "berry tea",
     image: "01.png",
     description: "A delicious Japanese berry tea selected for our pasabuy."
@@ -228,7 +228,7 @@ function esc(value) {
 
 function money(value) {
   if (!value || Number(value) === 0) {
-    return "Price coming soon";
+    return "0";
   }
 
   return "₱" + Number(value).toLocaleString("en-PH", {
@@ -594,7 +594,7 @@ function viewProduct(productId) {
       ${
         product.price > 0
           ? money(product.price)
-          : "Price coming soon"
+          : "0"
       }
     </h3>
 
