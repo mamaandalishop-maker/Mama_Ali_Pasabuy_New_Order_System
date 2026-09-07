@@ -2144,15 +2144,6 @@ try {
   btn.textContent = "Placing Order…";
 
     // ============================================
-    // READ + COMPRESS PAYMENT SCREENSHOT
-    // ============================================
-
-    const paymentProof =
-      await preparePaymentProof(paymentFile);
-
-    btn.textContent = "Placing Order…";
-
-    // ============================================
     // SEND ORDER TO GOOGLE APPS SCRIPT
     // ============================================
 
