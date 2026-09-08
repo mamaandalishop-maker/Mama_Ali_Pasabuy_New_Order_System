@@ -1357,7 +1357,7 @@ function trackOrder() {
       }
 
       const order = data.order;
-      const updates = order.updates || [];
+      const updates = order.updates?.updates || [];
 
       // ==========================================
       // ORDER HEADER
