@@ -1288,7 +1288,7 @@ function trackOrder() {
 
   if (!number) {
     result.innerHTML = `
-      <p>
+      <p style="color:#b00020;">
         Please enter your order number.
       </p>
     `;
@@ -1327,7 +1327,7 @@ function trackOrder() {
 
   const url =
     API_URL +
-    "?action=getOrderUpdates&orderNo=" +
+    "?action=getOrder&orderNo=" +
     encodeURIComponent(number);
 
   fetch(url)
@@ -1335,69 +1335,344 @@ function trackOrder() {
       if (!response.ok) {
         throw new Error("Unable to connect to the order tracking service.");
       }
+
       return response.json();
     })
     .then(data => {
 
-      const timeline =
-        document.getElementById("orderTimeline");
+      const timeline = document.getElementById("orderTimeline");
 
       if (!timeline) return;
 
-      if (!data.success) {
+      if (!data.success || !data.order) {
         timeline.innerHTML = `
-          <p style="color:#b00020;">
+          <p style="
+            color:#b00020;
+            font-weight:600;
+          ">
             ${esc(data.message || "Unable to retrieve order status.")}
           </p>
         `;
         return;
       }
 
-      if (!data.updates || data.updates.length === 0) {
-        timeline.innerHTML = `
-          <p>
-            No updates found for this order yet.
-          </p>
-        `;
-        return;
-      }
+      const order = data.order;
+      const updates = order.updates || [];
 
-      timeline.innerHTML = data.updates.map(update => `
+      // ==========================================
+      // ORDER HEADER
+      // ==========================================
+
+      let html = `
         <div style="
-          padding:14px 0;
-          border-bottom:1px solid #ddd;
+          background:#e8f7f3;
+          border-radius:16px;
+          padding:20px;
+          margin-bottom:18px;
         ">
+
           <div style="
-            font-weight:700;
-            color:#006b68;
+            font-size:13px;
+            color:#555;
             margin-bottom:5px;
           ">
-            ${esc(update.status || "")}
+            Order Number
+          </div>
+
+          <div style="
+            font-size:24px;
+            font-weight:700;
+            color:#006b68;
+          ">
+            ${esc(order.orderNo || number)}
           </div>
 
           <div style="
             font-size:13px;
-            color:#777;
-            margin-bottom:6px;
+            color:#666;
+            margin-top:5px;
           ">
-            ${update.dateTime
-              ? new Date(update.dateTime).toLocaleString()
-              : ""}
-          </div>
-
-          <div style="
-            font-size:15px;
-            color:#444;
-          ">
-            ${esc(update.message || "")}
+            Placed on ${
+              order.createdAt
+                ? new Date(order.createdAt).toLocaleDateString()
+                : "—"
+            }
           </div>
         </div>
-      `).join("");
+
+
+        <!-- PAYMENT SUMMARY -->
+
+        <div style="
+          display:grid;
+          grid-template-columns:repeat(3,1fr);
+          gap:10px;
+          background:#fffaf2;
+          border-radius:16px;
+          padding:18px;
+          margin-bottom:25px;
+        ">
+
+          <div>
+            <div style="
+              font-size:13px;
+              color:#555;
+              margin-bottom:5px;
+            ">
+              Order Total
+            </div>
+
+            <div style="
+              font-size:20px;
+              font-weight:700;
+              color:#006b68;
+            ">
+              ₱${Number(order.total || 0).toLocaleString("en-PH", {
+                minimumFractionDigits: 2
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div style="
+              font-size:13px;
+              color:#555;
+              margin-bottom:5px;
+            ">
+              Paid
+            </div>
+
+            <div style="
+              font-size:20px;
+              font-weight:700;
+              color:#006b68;
+            ">
+              ₱${Number(order.paidNow || 0).toLocaleString("en-PH", {
+                minimumFractionDigits: 2
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div style="
+              font-size:13px;
+              color:#555;
+              margin-bottom:5px;
+            ">
+              Remaining Balance
+            </div>
+
+            <div style="
+              font-size:20px;
+              font-weight:700;
+              color:#006b68;
+            ">
+              ₱${Number(order.balance || 0).toLocaleString("en-PH", {
+                minimumFractionDigits: 2
+              })}
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- STATUS TIMELINE -->
+
+        <div style="
+          font-size:22px;
+          font-weight:700;
+          color:#006b68;
+          margin-bottom:20px;
+        ">
+          Order Status
+        </div>
+      `;
+
+
+      // ==========================================
+      // TIMELINE
+      // ==========================================
+
+      if (updates.length === 0) {
+
+        html += `
+          <div style="
+            padding:20px;
+            color:#777;
+          ">
+            No status updates found for this order yet.
+          </div>
+        `;
+
+      } else {
+
+        html += `
+          <div style="
+            position:relative;
+            padding-left:48px;
+          ">
+        `;
+
+        updates.forEach((update, index) => {
+
+          const isLast = index === updates.length - 1;
+
+          const status = update.status || "Order Update";
+
+          const date = update.dateTime
+            ? new Date(update.dateTime).toLocaleString()
+            : "";
+
+          const message = update.message || "";
+
+          html += `
+
+            <div style="
+              position:relative;
+              padding-bottom:${isLast ? "5px" : "28px"};
+            ">
+
+              ${
+                !isLast
+                  ? `
+                    <div style="
+                      position:absolute;
+                      left:-32px;
+                      top:28px;
+                      width:2px;
+                      height:calc(100% - 5px);
+                      background:#0b8f83;
+                    ">
+                    </div>
+                  `
+                  : ""
+              }
+
+              <div style="
+                position:absolute;
+                left:-48px;
+                top:0;
+                width:34px;
+                height:34px;
+                border-radius:50%;
+                background:#0b8f83;
+                color:white;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:17px;
+                font-weight:700;
+                box-shadow:0 0 0 5px #dff5ef;
+              ">
+                ✓
+              </div>
+
+              <div style="
+                font-size:18px;
+                font-weight:700;
+                color:#006b68;
+                margin-bottom:4px;
+              ">
+                ${esc(status)}
+              </div>
+
+              <div style="
+                font-size:13px;
+                color:#777;
+                margin-bottom:6px;
+              ">
+                ${esc(date)}
+              </div>
+
+              ${
+                message
+                  ? `
+                    <div style="
+                      font-size:14px;
+                      color:#444;
+                      line-height:1.5;
+                    ">
+                      ${esc(message)}
+                    </div>
+                  `
+                  : ""
+              }
+
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+      }
+
+
+      // ==========================================
+      // LATEST STATUS
+      // ==========================================
+
+      if (updates.length > 0) {
+
+        const latest = updates[updates.length - 1];
+
+        html += `
+          <div style="
+            margin-top:28px;
+            background:#eaf6ff;
+            border-radius:16px;
+            padding:20px;
+          ">
+
+            <div style="
+              font-size:13px;
+              color:#555;
+              margin-bottom:5px;
+            ">
+              Latest Update
+            </div>
+
+            <div style="
+              font-size:20px;
+              font-weight:700;
+              color:#006b68;
+              margin-bottom:5px;
+            ">
+              ${esc(latest.status || "Order Update")}
+            </div>
+
+            <div style="
+              font-size:13px;
+              color:#777;
+              margin-bottom:8px;
+            ">
+              ${
+                latest.dateTime
+                  ? new Date(latest.dateTime).toLocaleString()
+                  : ""
+              }
+            </div>
+
+            <div style="
+              font-size:15px;
+              color:#444;
+              line-height:1.5;
+            ">
+              ${esc(
+                latest.message ||
+                "Your order status has been updated."
+              )}
+            </div>
+
+          </div>
+        `;
+      }
+
+
+      timeline.innerHTML = html;
+
     })
     .catch(error => {
 
-      const timeline =
-        document.getElementById("orderTimeline");
+      const timeline = document.getElementById("orderTimeline");
 
       if (!timeline) return;
 
@@ -1408,6 +1683,7 @@ function trackOrder() {
         ">
           Unable to load order status.
         </p>
+
         <p style="
           font-size:13px;
           color:#777;
@@ -1419,7 +1695,6 @@ function trackOrder() {
       console.error("Track order error:", error);
     });
 }
-
 // ============================================
 // CLOSE MODAL
 // ============================================
