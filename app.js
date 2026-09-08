@@ -1279,70 +1279,146 @@ function showTrack() {
 // ============================================
 
 function trackOrder() {
-
-  const input =
-    document.getElementById(
-      "trackingNumber"
-    );
-
-  const result =
-    document.getElementById(
-      "trackingResult"
-    );
-
+  const input = document.getElementById("trackingNumber");
+  const result = document.getElementById("trackingResult");
 
   if (!input || !result) return;
 
-
-  const number =
-    input.value.trim();
-
+  const number = input.value.trim();
 
   if (!number) {
-
     result.innerHTML = `
       <p>
         Please enter your order number.
       </p>
     `;
-
     return;
   }
 
-
   result.innerHTML = `
-  <div style="
-    margin-top:20px;
-    padding:20px;
-    border-radius:16px;
-    background:#f8f9f9;
-  ">
-
     <div style="
-      font-size:20px;
-      font-weight:700;
-      color:#006b68;
-      margin-bottom:8px;
+      margin-top:20px;
+      padding:20px;
+      border-radius:16px;
+      background:#f8f9f9;
     ">
-      Track Your Order
-    </div>
+      <div style="
+        font-size:20px;
+        font-weight:700;
+        color:#006b68;
+        margin-bottom:8px;
+      ">
+        Track Your Order
+      </div>
 
-    <div style="
-      font-size:14px;
-      color:#555;
-      margin-bottom:20px;
-    ">
-      Order No. <strong>${esc(number)}</strong>
-    </div>
+      <div style="
+        font-size:14px;
+        color:#555;
+        margin-bottom:20px;
+      ">
+        Order No. <strong>${esc(number)}</strong>
+      </div>
 
-    <div id="orderTimeline">
-      Loading order status...
+      <div id="orderTimeline">
+        Loading order status...
+      </div>
     </div>
+  `;
 
-  </div>
-`;
+  const url =
+    API_URL +
+    "?action=getOrderUpdates&orderNo=" +
+    encodeURIComponent(number);
+
+  fetch(url)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Unable to connect to the order tracking service.");
+      }
+      return response.json();
+    })
+    .then(data => {
+
+      const timeline =
+        document.getElementById("orderTimeline");
+
+      if (!timeline) return;
+
+      if (!data.success) {
+        timeline.innerHTML = `
+          <p style="color:#b00020;">
+            ${esc(data.message || "Unable to retrieve order status.")}
+          </p>
+        `;
+        return;
+      }
+
+      if (!data.updates || data.updates.length === 0) {
+        timeline.innerHTML = `
+          <p>
+            No updates found for this order yet.
+          </p>
+        `;
+        return;
+      }
+
+      timeline.innerHTML = data.updates.map(update => `
+        <div style="
+          padding:14px 0;
+          border-bottom:1px solid #ddd;
+        ">
+          <div style="
+            font-weight:700;
+            color:#006b68;
+            margin-bottom:5px;
+          ">
+            ${esc(update.status || "")}
+          </div>
+
+          <div style="
+            font-size:13px;
+            color:#777;
+            margin-bottom:6px;
+          ">
+            ${update.dateTime
+              ? new Date(update.dateTime).toLocaleString()
+              : ""}
+          </div>
+
+          <div style="
+            font-size:15px;
+            color:#444;
+          ">
+            ${esc(update.message || "")}
+          </div>
+        </div>
+      `).join("");
+    })
+    .catch(error => {
+
+      const timeline =
+        document.getElementById("orderTimeline");
+
+      if (!timeline) return;
+
+      timeline.innerHTML = `
+        <p style="
+          color:#b00020;
+          font-weight:600;
+        ">
+          Unable to load order status.
+        </p>
+        <p style="
+          font-size:13px;
+          color:#777;
+        ">
+          Please try again in a moment.
+        </p>
+      `;
+
+      console.error("Track order error:", error);
+    });
 }
-
 
 // ============================================
 // CLOSE MODAL
